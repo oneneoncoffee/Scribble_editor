@@ -9,11 +9,14 @@
  */
 
 #include <gtk/gtk.h>
-#include <gtksourceview/gtksource.h>
 #include <string.h>
 #include <ctype.h>
 #include <time.h>
 #include <unistd.h>
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wdeprecated-declarations"
+#include <gtksourceview/gtksource.h>
+#pragma GCC diagnostic pop
 
 typedef struct {
     GtkWidget *window;
@@ -63,6 +66,7 @@ static void on_save_as(GtkWidget *widget, gpointer data);
 static void parse_symbols(EditorApp *app);
 static void update_status(EditorApp *app);
 static void on_toggle_focus_mode(GtkCheckMenuItem *item, gpointer data);
+static void on_change_font(GtkWidget *widget, gpointer data);
 static void insert_at_cursor(EditorApp *app, const gchar *text); 
 static void on_bookmark_list_row_activated(GtkTreeView *tree_view, GtkTreePath *path, 
                                           GtkTreeViewColumn *column, gpointer data); 
@@ -1961,6 +1965,28 @@ static void on_refresh_symbols(GtkWidget *widget, gpointer data) {
     parse_symbols(app);
 }
 
+/* Function to show the updates in a popup */
+static void show_update_notes(GtkWidget *widget, gpointer data) {
+    GtkWidget *parent = (GtkWidget *)data;
+    GtkWidget *msg_dialog = gtk_message_dialog_new(GTK_WINDOW(parent),
+        GTK_DIALOG_MODAL | GTK_DIALOG_DESTROY_WITH_PARENT,
+        GTK_MESSAGE_INFO,
+        GTK_BUTTONS_OK,
+        "Scrible Sketch Book - v2.9 Updates");
+
+    gtk_message_dialog_format_secondary_text(GTK_MESSAGE_DIALOG(msg_dialog),
+        "• Added GCC Quick Build & Run system.\n"
+        "• Integrated ANSI C syntax highlighting.\n"
+        "• Font size and safe font dialog update.\n"
+        "• Improved symbol browser navigation.\n\n"
+        "Note: fixed library header bug in this version "
+        "of Scrible. \n"
+        " ");
+
+    gtk_dialog_run(GTK_DIALOG(msg_dialog));
+    gtk_widget_destroy(msg_dialog);
+}
+
 static void on_about(GtkWidget *widget, gpointer data) {
     EditorApp *app = (EditorApp *)data;
     GtkWidget *dialog;
@@ -1969,33 +1995,38 @@ static void on_about(GtkWidget *widget, gpointer data) {
     
     dialog = gtk_about_dialog_new();
     
-    /* 1. Standard Info */
-    gtk_about_dialog_set_program_name(GTK_ABOUT_DIALOG(dialog), "scrible sketch book like ANSI C Code Editor");
-    gtk_about_dialog_set_version(GTK_ABOUT_DIALOG(dialog), "Version 1.7");
-    gtk_about_dialog_set_logo_icon_name(GTK_ABOUT_DIALOG(dialog), "accessories-text-editor");
-    /* This adds a "License" button that opens a sub-window with the GPL 3.0 text */
-    gtk_about_dialog_set_license_type(GTK_ABOUT_DIALOG(dialog), GTK_LICENSE_GPL_3_0);
-    gtk_about_dialog_set_wrap_license(GTK_ABOUT_DIALOG(dialog), TRUE);   
-    gtk_about_dialog_set_website(GTK_ABOUT_DIALOG(dialog), "https://github.com/oneneoncoffee/");
-    gtk_about_dialog_set_website_label(GTK_ABOUT_DIALOG(dialog), "https://github.com/oneneoncoffee/");
-   
-    /* 2. Comments */
-    gtk_about_dialog_set_comments(GTK_ABOUT_DIALOG(dialog), 
-                                  "A GTK+ 3 code editor with syntax highlighting and simple symbol browser."
-                                  "Included are themes and it also has a working build/run & Quick build GCC system.\n\n "
-                                  "This software is 100% free and open source \n");
+    /*  Add the "Update Notes" Button at the top */
+    GtkWidget *content_area = gtk_dialog_get_content_area(GTK_DIALOG(dialog));
+    GtkWidget *update_btn = gtk_button_new_with_label("✨ View What's New");
+    
+    // Pack it at the top (index 0)
+    gtk_box_pack_start(GTK_BOX(content_area), update_btn, FALSE, FALSE, 10);
+    gtk_box_reorder_child(GTK_BOX(content_area), update_btn, 0);
+    
+    // Connect the click signal
+    g_signal_connect(update_btn, "clicked", G_CALLBACK(show_update_notes), dialog);
 
-    const gchar *authors[] = {"Johnny Buckallew Stroud", "Contributor Name", "Special thanks to Jesus he loves you!", "Thank you god with a big 'G' Amen", "I am A big old Linux nerd and mountian goat.", " ",NULL};
+    /*  Standard Info */
+    gtk_about_dialog_set_program_name(GTK_ABOUT_DIALOG(dialog), "Scrible Sketch Book");
+    gtk_about_dialog_set_version(GTK_ABOUT_DIALOG(dialog), "Version 2.9");
+    gtk_about_dialog_set_logo_icon_name(GTK_ABOUT_DIALOG(dialog), "accessories-text-editor");
+    gtk_about_dialog_set_license_type(GTK_ABOUT_DIALOG(dialog), GTK_LICENSE_GPL_3_0);
+    gtk_about_dialog_set_website(GTK_ABOUT_DIALOG(dialog), "https://github.com/oneneoncoffee/");
+   
+    gtk_about_dialog_set_comments(GTK_ABOUT_DIALOG(dialog), 
+        "A GTK+ 3 code editor with syntax highlighting.\n"
+        "This software is 100% free and open source.");
+
+    const gchar *authors[] = {"Johnny Buckallew Stroud", "Contributor Name", "Special thanks to Jesus!", NULL};
     gtk_about_dialog_set_authors(GTK_ABOUT_DIALOG(dialog), authors);
 
-    /* 4. Apply Black Background & White Bold Text via CSS */
+    /* Apply Black & Gold Theme ONLY to this dialog */
     provider = gtk_css_provider_new();
-
-    /* This CSS targets labels inside the about dialog to be white and bold on a black background */
     const gchar *css = 
-        "dialog { background-color: #000000; color: #ffffff; }"
-        "dialog.about { background-color: #000000; color: #ffa600; }"
-        "dialog.about label { background-color: #000000; color: #ffffff; font-weight: bold;  }";
+        "dialog, grid, box, stack, scrolledwindow, viewport, list, row { background-color: #000000; }"
+        "label { color: #ffffff; font-weight: bold; }"
+        "label.title { color: #ffa600; font-size: 1.2em; }"
+        "button { background-color: #222222; color: #ffa600; border: 1px solid #ffa600; }";
     
     gtk_css_provider_load_from_data(provider, css, -1, NULL);
     
@@ -2003,12 +2034,16 @@ static void on_about(GtkWidget *widget, gpointer data) {
     gtk_style_context_add_provider(context, GTK_STYLE_PROVIDER(provider), 
                                    GTK_STYLE_PROVIDER_PRIORITY_APPLICATION);
     
+    /* Show and Run */
     gtk_window_set_transient_for(GTK_WINDOW(dialog), GTK_WINDOW(app->window));
+    gtk_widget_show_all(dialog); // Necessary to make the manually added button appear
     gtk_dialog_run(GTK_DIALOG(dialog));
     
+    /* Cleanup */
     g_object_unref(provider);
     gtk_widget_destroy(dialog);
 }
+
 
 /* Editor menu call backs */
 static void on_undo(GtkWidget *widget, gpointer data) {
@@ -2285,6 +2320,7 @@ static void on_insert_ansi_c_program(GtkWidget *widget, gpointer data) {
     insert_at_cursor(app, buf);
 }
 
+
 static void create_menubar(EditorApp *app, GtkWidget *vbox) {
     GtkWidget *menubar = gtk_menu_bar_new();
     
@@ -2529,6 +2565,10 @@ g_signal_connect(datetime_snip, "activate", G_CALLBACK(on_insert_datetime), app)
     GtkWidget *view_menu = gtk_menu_new();
     GtkWidget *view_item = gtk_menu_item_new_with_mnemonic("_View");
 
+    GtkWidget *font_item = gtk_menu_item_new_with_label("Change Font...");
+    g_signal_connect(font_item, "activate", G_CALLBACK(on_change_font), app);
+    gtk_menu_shell_append(GTK_MENU_SHELL(view_menu), font_item);
+
     GtkWidget *toggle_side = gtk_menu_item_new_with_label("Toggle Sidebar");
     g_signal_connect(toggle_side, "activate", G_CALLBACK(on_toggle_sidebar), app);
     gtk_menu_shell_append(GTK_MENU_SHELL(view_menu), toggle_side);
@@ -2757,6 +2797,51 @@ static void on_cursor_moved(GtkTextBuffer *buffer,
     if (mark == gtk_text_buffer_get_insert(buffer)) {
         update_status(app);
     }
+}
+
+static void on_change_font(GtkWidget *widget, gpointer data) {
+    EditorApp *app = (EditorApp *)data;
+    GtkWidget *dialog;
+    
+    dialog = gtk_font_chooser_dialog_new("Choose Editor Font", GTK_WINDOW(app->window));
+
+    if (gtk_dialog_run(GTK_DIALOG(dialog)) == GTK_RESPONSE_OK) {
+        gchar *font_desc_str = gtk_font_chooser_get_font(GTK_FONT_CHOOSER(dialog));
+        PangoFontDescription *desc = pango_font_description_from_string(font_desc_str);
+        
+        const char *family = pango_font_description_get_family(desc);
+        int size = pango_font_description_get_size(desc);
+        
+        // Pango sizes are in points * PANGO_SCALE or absolute pixels
+        // Convert to a standard point size for CSS
+        double size_pt = (double)size / PANGO_SCALE;
+
+        GtkCssProvider *provider = gtk_css_provider_new();
+        
+        /* * We construct a clean CSS string. 
+         * Using 'font-family' and 'font-size' separately is safer than the shorthand.
+         */
+        gchar *css = g_strdup_printf(
+            "textview { font-family: '%s'; font-size: %.1fpt; }", 
+            family, size_pt
+        );
+        
+        gtk_css_provider_load_from_data(provider, css, -1, NULL);
+        
+        GtkStyleContext *context = gtk_widget_get_style_context(app->view);
+        gtk_style_context_add_provider(context, 
+                                       GTK_STYLE_PROVIDER(provider), 
+                                       GTK_STYLE_PROVIDER_PRIORITY_APPLICATION);
+        
+        g_print("Font updated to: %s (Parsed: %s at %.1fpt)\n", font_desc_str, family, size_pt);
+        
+        pango_font_description_free(desc);
+        g_free(font_desc_str);
+        g_free(css);
+        g_object_unref(provider);
+    }
+
+    gtk_widget_destroy(dialog);
 }
 
 int main(int argc, char *argv[]) {
